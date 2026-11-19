@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The browser blocks every request to another host, so nothing typed here can leave the page -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Markdown to Word, Google Docs & Gmail</title>
+<meta name="description" content="Convert markdown (from ChatGPT, Claude, Copilot) to .docx, .html or .pdf, or copy it formatted into Word, Google Docs or Gmail. Your data never leaves your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f9fafb; --card: #fff; --field: #f9fafb; --border: #e5e7eb; --text: #111827; --muted: #4b5563; --faint: #9ca3af;
+    --accent: #3b82f6; --btn: #06b6d4; --btn-hover: #0891b2;
+    --code-bg: #f3f4f6; --code: inherit; --quote: #6b7280; --th: #f9fafb;
+    --ok-bg: #dcfce7; --ok: #15803d; --err-bg: #fee2e2; --err: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111827; --card: #1f2937; --field: #374151; --border: #4b5563; --text: #f3f4f6; --muted: #d1d5db;
+      --accent: #60a5fa; --btn: #0891b2; --btn-hover: #0e7490;
+      --code-bg: #374151; --code: #60a5fa; --quote: #9ca3af; --th: #111827;
+      --ok-bg: #14532d; --ok: #86efac; --err-bg: #7f1d1d; --err: #fca5a5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { text-align: center; padding: 1.5rem 1rem 1.25rem; }
+  header h1 { margin: 0; padding-inline: 3.5rem; font-size: clamp(1.5rem, 1rem + 2vw, 2.25rem); line-height: 1.2; background: linear-gradient(to right, #2563eb, #9333ea, #db2777); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  header p { margin: .5rem auto 0; max-width: 42rem; color: var(--muted); }
+  main { flex: 1; display: grid; gap: 1.5rem; width: 100%; max-width: 120rem; margin: 0 auto; padding: 0 1rem 1.5rem; }
+  .card { min-width: 0; display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; background: var(--card); border-radius: 1rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1); }
+  .card > h2 { margin: 0; display: flex; align-items: center; gap: .5rem; font-size: 1.25rem; }
+  .box { height: max(18rem, 60dvh); border: 1px solid var(--border); border-radius: .75rem; }
+  textarea { width: 100%; height: 100%; display: block; resize: none; padding: 1rem; border: 0; border-radius: inherit; background: var(--field); color: inherit; font: .875rem/1.5 ui-monospace, Menlo, monospace; }
+  textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #count { margin-left: auto; color: var(--faint); font-size: .75rem; font-weight: 400; }
+  .drop { align-self: start; width: 100%; padding: .75rem; text-align: center; border: 2px dashed var(--border); border-radius: .75rem; color: var(--muted); font-size: .75rem; transition: .15s; }
+  .drop:hover, .drop.over { border-color: var(--accent); }
+  .drop.over { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .drop p { margin: .25rem 0 .5rem; }
+  .drop label { display: inline-flex; align-items: center; gap: .25rem; padding: .375rem .75rem; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: .5rem; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); cursor: pointer; }
+  svg { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .drop > svg { width: 1.25rem; height: 1.25rem; color: var(--faint); }
+  .preview { overflow: auto; padding: 1.5rem; }
+  .preview:empty::before { content: "Your markdown preview will appear here..."; display: block; padding: 2rem 0; text-align: center; font-style: italic; color: var(--faint); }
+  .controls { display: flex; flex-direction: column; gap: 1rem; container-type: inline-size; }
+  .controls label { font-size: .875rem; font-weight: 500; color: var(--muted); }
+  .name { display: flex; margin-top: .5rem; }
+  .name input { flex: 1; min-width: 0; padding: .5rem 1rem; border: 1px solid var(--border); border-radius: .75rem 0 0 .75rem; background: var(--card); color: inherit; font: inherit; }
+  .name span { padding: .5rem 1rem; border: 1px solid var(--border); border-left: 0; border-radius: 0 .75rem .75rem 0; background: var(--field); color: var(--muted); font-size: .875rem; }
+  .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  @container (min-width: 36rem) { .buttons { grid-template-columns: repeat(4, 1fr); } }
+  button { display: flex; align-items: center; justify-content: center; gap: .375rem; padding: .625rem .75rem; border: 0; border-radius: .5rem; background: var(--btn); color: #fff; font-family: inherit; font-size: .8125rem; font-weight: 500; line-height: 1.25; cursor: pointer; transition: .15s; }
+  button:hover { background: var(--btn-hover); box-shadow: 0 4px 6px -1px rgb(0 0 0 / .1); }
+  button:disabled { background: var(--faint); box-shadow: none; cursor: not-allowed; }
+  #status { position: fixed; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: calc(100% - 2rem); padding: .75rem 1rem; border-radius: .5rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / .2); background: var(--ok-bg); color: var(--ok); font-size: .875rem; }
+  #status.err { background: var(--err-bg); color: var(--err); }
+  .corner { position: absolute; top: 0; right: 0; }
+  .corner svg { display: block; width: 5rem; height: 5rem; stroke: none; fill: var(--text); }
+  .corner .octo { fill: var(--bg); }
+  footer { padding: 0 1rem 1rem; text-align: center; font-size: .875rem; color: var(--muted); }
+  footer a { color: inherit; }
+  [hidden] { display: none !important; }
+  @media (min-width: 64rem) {
+    main { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; }
+    .card { display: grid; grid-row: span 3; grid-template-rows: subgrid; }
+  }
+  @media (min-width: 64rem) and (min-height: 40rem) {
+    body { height: 100dvh; }
+    main { min-height: 0; }
+    .box { height: auto; min-height: 0; }
+  }
+
+  .preview h1 { margin: .67em 0; font-size: 2em; line-height: 1.2; }
+  .preview h2 { margin: .83em 0; font-size: 1.5em; line-height: 1.3; }
+  .preview h3 { margin: 1em 0; font-size: 1.17em; line-height: 1.4; }
+  .preview h4 { margin: 1.33em 0; font-size: 1em; }
+  .preview h5 { margin: 1.67em 0; font-size: .83em; }
+  .preview h6 { margin: 2.33em 0; font-size: .67em; }
+  .preview p { margin: .5em 0; line-height: 1.6; }
+  .preview ul, .preview ol { margin: .5em 0; padding-left: 2em; }
+  .preview li { margin: .25em 0; }
+  .preview code { padding: .2em .4em; border-radius: 3px; background: var(--code-bg); color: var(--code); font: .9em ui-monospace, Menlo, monospace; }
+  .preview pre { margin: .5em 0; padding: 1em; overflow-x: auto; border-radius: 6px; background: var(--code-bg); }
+  .preview pre code { padding: 0; background: none; color: inherit; }
+  .preview blockquote { margin: .5em 0; padding-left: 1em; border-left: 4px solid var(--border); color: var(--quote); }
+  .preview table { width: 100%; margin: .5em 0; border-collapse: collapse; }
+  .preview th, .preview td { padding: .5em; text-align: left; border: 1px solid var(--border); }
+  .preview th { background: var(--th); }
+  .preview hr { margin: 1em 0; border: 0; border-top: 1px solid var(--border); }
+  .preview a { color: var(--accent); }
+  .preview img { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<a class="corner" href="https://github.com/ddelange/markdown2docs" aria-label="View source on GitHub"><svg viewBox="0 0 250 250" aria-hidden="true"><path d="M0 0l115 115h15l12 27 108 108V0z"/><path class="octo" d="M128 109c-15-9-9-19-9-19 3-7 2-11 2-11-1-7 3-2 3-2 4 5 2 11 2 11-3 10 5 15 9 16"/><path class="octo" d="M115 115s4 2 5 0l14-14c3-2 6-3 8-3-8-11-15-24 2-41 5-5 10-7 16-7 1-2 3-7 12-11 0 0 5 3 7 16 4 2 8 5 12 9s7 8 9 12c14 3 17 7 17 7-4 8-9 11-11 11 0 6-2 11-7 16-16 16-30 10-41 2 0 3-1 7-5 11l-12 11c-1 1 1 5 1 5z"/></svg></a>
+<header>
+  <h1>Markdown to Word, Google Docs & Gmail</h1>
+  <p>Paste or drop markdown. Download .docx, .html or .pdf, or copy it formatted into Word, Google Docs or a Gmail draft. <strong>Your data never leaves your browser.</strong></p>
+</header>
+<main>
+  <section class="card">
+    <h2>Markdown Input<small id="count"></small></h2>
+    <div class="box">
+      <textarea id="md" spellcheck="false" aria-label="Markdown input" placeholder="# Title&#10;&#10;A paragraph with **bold** and *italic* text.">
+# Weekly update
+
+Hi team, here is where we stand. Paste this into a **Gmail draft**, a *Google Doc* or ~~a fax~~ Word with the copy button.
+
+## Shipped
+
+- Faster search on the **orders** page
+  - Indexes on `customer_id` and `created_at`
+  - p95 latency down from 1.2 s to 180 ms
+- New onboarding emails
+- Dark mode for the dashboard
+
+## Next steps
+
+1. Roll out search to all regions
+2. Review the pricing page
+   1. Headline copy
+   2. FAQ section
+3. Plan the Q1 offsite
+
+## Offsite checklist
+
+- [x] Budget approved
+- [ ] Venue booked
+- [ ] Agenda shared
+
+> **Heads up:** the database migration runs Sunday night.
+> > Expect up to 10 minutes of read only mode.
+
+## Numbers
+
+| Metric | Last week | This week |
+|--------|----------:|----------:|
+| Signups | 412 | 468 |
+| Churn | 2.1% | 1.8% |
+| NPS | 41 | 44 |
+
+## How we measure p95
+
+```python
+def p95(latencies):
+    ranked = sorted(latencies)
+    return ranked[int(len(ranked) * 0.95)]
+```
+
+New to markdown? See the [cheat sheet](https://www.markdownguide.org/cheat-sheet/).
+
+---
+
+Thanks all, see you Monday!
+</textarea>
+    </div>
+    <div class="drop" id="drop">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      <p>Drag & drop your .md file or</p>
+      <label><svg viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8"/></svg>Choose File<input type="file" id="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden></label>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Docs Output</h2>
+    <div class="box preview" id="preview"></div>
+    <div class="controls">
+      <div>
+        <label for="name">Document Name</label>
+        <div class="name"><input id="name" value="document" placeholder="Enter file name"><span>.docx</span></div>
+      </div>
+      <div class="buttons">
+        <button id="docx"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download .docx</button>
+        <button id="html"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download .html</button>
+        <button id="pdf"><svg viewBox="0 0 24 24"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>Save as .pdf</button>
+        <button id="copy"><svg viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8"/></svg>Copy for Docs/Gmail</button>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>Made with ❤️ by <a href="https://github.com/ddelange">ddelange</a> · Open source (<a href="https://github.com/ddelange/markdown2docs/blob/main/LICENSE">BSD-3</a>)</footer>
+<div id="status" role="status" hidden></div>
+
+<script defer src="vendor/marked.umd.js"></script>
+<script defer src="vendor/purify.min.js"></script>
+<script defer src="vendor/docx.iife.js"></script>
+<script type="module">
+const { Document, Packer, Paragraph, TextRun, ExternalHyperlink, Table, TableRow, TableCell, HeadingLevel, BorderStyle, ShadingType, WidthType } = docx;
+
+const $ = (id) => document.getElementById(id);
+const md = $("md"), preview = $("preview"), name = $("name"), status = $("status");
+
+// marked keeps entities like &amp; verbatim in token text
+const decode = (s = "") => s.includes("&") ? new DOMParser().parseFromString(s, "text/html").body.textContent : s;
+const shade = (fill) => ({ type: ShadingType.CLEAR, fill });
+const line = { style: BorderStyle.SINGLE, size: 1, color: "000000" };
+
+function inline(tokens = [], style = {}) {
+  return tokens.flatMap((t) => {
+    switch (t.type) {
+      case "strong": return inline(t.tokens, { ...style, bold: true });
+      case "em": return inline(t.tokens, { ...style, italics: true });
+      case "del": return inline(t.tokens, { ...style, strike: true });
+      case "codespan": return [new TextRun({ text: decode(t.text), font: "Courier New", color: "666666", ...style })];
+      case "link": return [new ExternalHyperlink({ link: t.href, children: inline(t.tokens, { ...style, style: "Hyperlink" }) })];
+      case "br": return [new TextRun({ break: 1 })];
+      case "html": return /^<br\s*\/?>$/i.test(t.text.trim()) ? [new TextRun({ break: 1 })] : [];
+      case "checkbox": return [new TextRun({ text: t.checked ? "☑ " : "☐ ", ...style })];
+      default: return t.tokens ? inline(t.tokens, style) : [new TextRun({ text: decode(t.text), ...style })];
+    }
+  });
+}
+
+function list(t, indent) {
+  return t.items.flatMap((item, i) => [
+    new Paragraph({
+      children: [new TextRun(t.ordered ? `${(t.start || 1) + i}. ` : item.task ? "" : "• "), ...item.tokens.filter((c) => c.type !== "list").flatMap((c) => inline(c.tokens ?? [c]))],
+      spacing: { after: 80 },
+      indent: { left: indent + 720, hanging: 360 },
+    }),
+    ...item.tokens.filter((c) => c.type === "list").flatMap((c) => list(c, indent + 360)),
+  ]);
+}
+
+function cell(c, header) {
+  return new TableCell({
+    children: [new Paragraph({ children: inline(c.tokens, header ? { bold: true } : {}) })],
+    shading: header ? shade("F0F0F0") : undefined,
+    margins: { top: 100, bottom: 100, left: 100, right: 100 },
+  });
+}
+
+function blocks(tokens, indent = 0) {
+  return tokens.flatMap((t) => {
+    switch (t.type) {
+      case "heading": return [new Paragraph({ heading: HeadingLevel[`HEADING_${t.depth}`], children: inline(t.tokens), spacing: { after: 200 } })];
+      case "paragraph": case "text": return [new Paragraph({ children: inline(t.tokens ?? [t]), spacing: { after: 120 }, indent: { left: indent } })];
+      case "list": return list(t, indent);
+      case "blockquote": return blocks(t.tokens, indent + 720);
+      case "code": return t.text.split("\n").map((l) => new Paragraph({
+        children: [new TextRun({ text: l || " ", font: "Courier New", color: "333333" })],
+        spacing: { before: 40, after: 40 }, indent: { left: indent + 360 }, shading: shade("F5F5F5"),
+      }));
+      case "table": return [
+        new Table({
+          rows: [new TableRow({ tableHeader: true, children: t.header.map((c) => cell(c, true)) }), ...t.rows.map((r) => new TableRow({ children: r.map((c) => cell(c)) }))],
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: { top: line, bottom: line, left: line, right: line, insideHorizontal: line, insideVertical: line },
+        }),
+        new Paragraph({ spacing: { after: 200 } }),
+      ];
+      case "hr": return [new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "auto", space: 1 } }, spacing: { before: 200, after: 200 } })];
+      case "space": return [];
+      default: return t.text ? [new Paragraph({ text: decode(t.text), spacing: { after: 120 }, indent: { left: indent } })] : [];
+    }
+  });
+}
+
+const toDocx = (text) => new Document({ sections: [{ children: blocks(marked.lexer(text)) }] });
+const toHtml = (text) => DOMPurify.sanitize(marked.parse(text));
+const htmlDoc = (text, title = "") => `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${title.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`)}</title>
+<style>
+  @page { margin: 2cm; }
+  body { font-family: Arial, sans-serif; line-height: 1.6; color: #000; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  code { background: #f3f4f6; padding: .2em .4em; border-radius: 3px; font-family: monospace; }
+  pre { background: #f3f4f6; padding: 1em; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  blockquote { border-left: 4px solid #e5e7eb; padding-left: 1em; margin: .5em 0; color: #6b7280; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #e5e7eb; padding: .5em; text-align: left; }
+  th { background: #f9fafb; }
+  hr { border: 0; border-top: 1px solid #e5e7eb; }
+  a { color: #3b82f6; }
+  @media print { pre { white-space: pre-wrap; } pre, tr, img, blockquote { break-inside: avoid; } h1, h2, h3, h4, h5, h6 { break-after: avoid; } }
+</style>
+</head>
+<body>
+${toHtml(text)}
+</body>
+</html>`;
+
+const base = () => name.value.trim().replace(/\.(docx|html)$/i, "") || "document";
+
+let timer;
+function flash(message, error = false) {
+  status.textContent = message;
+  status.className = error ? "err" : "";
+  status.hidden = false;
+  clearTimeout(timer);
+  timer = setTimeout(() => (status.hidden = true), error ? 5000 : 3000);
+}
+
+function save(blob, filename) {
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: filename });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  flash(`Downloaded "${filename}"`);
+}
+
+function render() {
+  preview.innerHTML = md.value.trim() ? toHtml(md.value) : "";
+  $("count").textContent = `${md.value.length} characters`;
+  for (const b of document.querySelectorAll("button")) b.disabled = !md.value.trim();
+}
+
+async function load(file) {
+  if (!file) return;
+  if (!/\.(md|markdown|txt)$/i.test(file.name) && !file.type.startsWith("text/")) return flash("Please use a Markdown file (.md or .markdown)", true);
+  md.value = await file.text();
+  name.value = file.name.replace(/\.(md|markdown|txt)$/i, "");
+  render();
+}
+
+md.addEventListener("input", render);
+$("file").addEventListener("change", (e) => load(e.target.files[0]));
+
+// Dropping a file anywhere would otherwise make the browser navigate away from the page
+const isFile = (e) => e.dataTransfer.types.includes("Files");
+document.addEventListener("dragover", (e) => isFile(e) && (e.preventDefault(), $("drop").classList.add("over")));
+document.addEventListener("dragleave", () => $("drop").classList.remove("over"));
+document.addEventListener("drop", (e) => {
+  $("drop").classList.remove("over");
+  if (isFile(e)) e.preventDefault(), load(e.dataTransfer.files[0]);
+});
+
+$("docx").addEventListener("click", async () => {
+  try {
+    save(await Packer.toBlob(toDocx(md.value)), `${base()}.docx`);
+  } catch (e) {
+    console.error(e);
+    flash(`Failed to convert document: ${e.message}`, true);
+  }
+});
+
+$("html").addEventListener("click", () => save(new Blob([htmlDoc(md.value, base())], { type: "text/html;charset=utf-8" }), `${base()}.html`));
+
+// The print dialog's "Save as PDF" names the file after the iframe's <title>
+$("pdf").addEventListener("click", () => {
+  const frame = Object.assign(document.createElement("iframe"), { srcdoc: htmlDoc(md.value, base()) });
+  frame.style.cssText = "position: fixed; width: 0; height: 0; border: 0";
+  frame.onload = () => {
+    frame.contentWindow.onafterprint = () => frame.remove();
+    frame.contentWindow.print();
+  };
+  document.body.append(frame);
+});
+
+$("copy").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([htmlDoc(md.value)], { type: "text/html" }),
+      "text/plain": new Blob([md.value], { type: "text/plain" }),
+    })]);
+    flash("Copied! Paste into Word, Google Docs or Gmail.");
+  } catch (e) {
+    console.error(e);
+    flash("Failed to copy. Try a download instead.", true);
+  }
+});
+
+render();
+</script>
+</body>
+</html>
