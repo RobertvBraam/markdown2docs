@@ -346,6 +346,25 @@ function rebuildWordLists(body) {
   }
 }
 
+const firstText = (element) => element.type === "text" ? element : element.children?.reduce((found, child) => found ?? firstText(child), null);
+
+// mammoth starts every numbered list at 1, so each numbered paragraph carries Word's running count into the HTML as a hidden prefix that becomes its list's start
+// TODO: a list that Word restarts at 1 (a startOverride on its w:num) keeps counting here, since mammoth reads neither the override nor the numId; reading numbering.xml would fix it
+async function docxToHtml(file) {
+  const counts = new Map();
+  const transformDocument = mammoth.transforms.paragraph((paragraph) => {
+    const level = paragraph.numbering;
+    if (!level) return paragraph;
+    for (const other of counts.keys()) if (+other.level > +level.level) counts.delete(other);
+    counts.set(level, (counts.get(level) ?? 0) + 1);
+    const text = firstText(paragraph);
+    if (level.isOrdered && text) text.value = `⁣${counts.get(level)}⁣${text.value}`;
+    return paragraph;
+  });
+  const { value } = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() }, { transformDocument });
+  return value.replace(/<ol>(<li>(?:<[^>]+>)*)⁣(\d+)⁣/g, '<ol start="$2">$1').replace(/⁣\d+⁣/g, "");
+}
+
 // Google Docs wraps its clipboard HTML in a non-bold <b> with <br> spacers, sets bold and italic as inline styles, and puts sublists next to their item instead of inside it
 function toMarkdown(html) {
   const body = new DOMParser().parseFromString(html, "text/html").body;
@@ -396,7 +415,7 @@ function updateControls() {
 async function load(file) {
   if (!file) return;
   try {
-    if (/\.docx$/i.test(file.name)) md.value = toMarkdown((await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() })).value);
+    if (/\.docx$/i.test(file.name)) md.value = toMarkdown(await docxToHtml(file));
     else if (/\.html?$/i.test(file.name) || file.type === "text/html") md.value = toMarkdown(await file.text());
     else if (/\.(md|markdown|txt)$/i.test(file.name) || file.type.startsWith("text/")) md.value = await file.text();
     else return flash("Please use a Markdown (.md), Word (.docx) or HTML file", true);
