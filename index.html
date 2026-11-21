@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Markdown to Word, Google Docs & Gmail</title>
-<meta name="description" content="Convert markdown (from ChatGPT, Claude, Copilot) to .docx, .html or .pdf, or copy it formatted into Word, Google Docs or Gmail. Your data never leaves your browser.">
+<meta name="description" content="Convert markdown (from ChatGPT, Claude, Copilot) to .docx, .html or .pdf, or copy it formatted into Word, Google Docs or Gmail. Or turn Word, HTML and Google Docs back into markdown. Your data never leaves your browser.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z'/%3E%3Cpath d='M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -40,7 +40,7 @@
   .drop:hover, .drop.over { border-color: var(--accent); }
   .drop.over { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .drop p { margin: .25rem 0 .5rem; }
-  .drop label { display: inline-flex; align-items: center; gap: .25rem; padding: .375rem .75rem; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: .5rem; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); cursor: pointer; }
+  .drop label, .drop button { display: inline-flex; align-items: center; gap: .25rem; margin: .125rem; padding: .375rem .75rem; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: .5rem; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); font: inherit; cursor: pointer; }
   svg { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .drop > svg { width: 1.25rem; height: 1.25rem; color: var(--faint); }
   .preview { overflow: auto; padding: 1.5rem; }
@@ -55,6 +55,7 @@
   button { display: flex; align-items: center; justify-content: center; gap: .375rem; padding: .625rem .75rem; border: 0; border-radius: .5rem; background: var(--btn); color: #fff; font-family: inherit; font-size: .8125rem; font-weight: 500; line-height: 1.25; cursor: pointer; transition: .15s; }
   button:hover { background: var(--btn-hover); box-shadow: 0 4px 6px -1px rgb(0 0 0 / .1); }
   button:disabled { background: var(--faint); box-shadow: none; cursor: not-allowed; }
+  .drop button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); box-shadow: none; }
   #status { position: fixed; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: calc(100% - 2rem); padding: .75rem 1rem; border-radius: .5rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / .2); background: var(--ok-bg); color: var(--ok); font-size: .875rem; }
   #status.err { background: var(--err-bg); color: var(--err); }
   .corner { position: absolute; top: 0; right: 0; }
@@ -98,7 +99,7 @@
 <a class="corner" href="https://github.com/ddelange/markdown2docs" aria-label="View source on GitHub"><svg viewBox="0 0 250 250" aria-hidden="true"><path d="M0 0l115 115h15l12 27 108 108V0z"/><path class="octo" d="M128 109c-15-9-9-19-9-19 3-7 2-11 2-11-1-7 3-2 3-2 4 5 2 11 2 11-3 10 5 15 9 16"/><path class="octo" d="M115 115s4 2 5 0l14-14c3-2 6-3 8-3-8-11-15-24 2-41 5-5 10-7 16-7 1-2 3-7 12-11 0 0 5 3 7 16 4 2 8 5 12 9s7 8 9 12c14 3 17 7 17 7-4 8-9 11-11 11 0 6-2 11-7 16-16 16-30 10-41 2 0 3-1 7-5 11l-12 11c-1 1 1 5 1 5z"/></svg></a>
 <header>
   <h1>Markdown to Word, Google Docs & Gmail</h1>
-  <p>Paste or drop markdown. Download .docx, .html or .pdf, or copy it formatted into Word, Google Docs or a Gmail draft. <strong>Your data never leaves your browser.</strong></p>
+  <p>Paste or drop markdown. Download .docx, .html or .pdf, or copy it formatted into Word, Google Docs or a Gmail draft. Going the other way? Drop a .docx or .html file, or paste from Google Docs or Word. <strong>Your data never leaves your browser.</strong></p>
 </header>
 <main>
   <section class="card">
@@ -159,8 +160,9 @@ Thanks all, see you Monday!
     </div>
     <div class="drop" id="drop">
       <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-      <p>Drag & drop your .md file or</p>
-      <label><svg viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8"/></svg>Choose File<input type="file" id="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden></label>
+      <p>Drag & drop a .md, .docx or .html file or</p>
+      <label><svg viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8"/></svg>Choose File<input type="file" id="file" accept=".md,.markdown,.txt,.docx,.html,.htm,text/markdown,text/plain,text/html" hidden></label>
+      <button id="paste" type="button"><svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>Paste from Docs/Word</button>
     </div>
   </section>
   <section class="card">
@@ -186,6 +188,9 @@ Thanks all, see you Monday!
 <script defer src="vendor/marked.umd.js"></script>
 <script defer src="vendor/purify.min.js"></script>
 <script defer src="vendor/docx.iife.js"></script>
+<script defer src="vendor/turndown.js"></script>
+<script defer src="vendor/turndown-plugin-gfm.js"></script>
+<script defer src="vendor/mammoth.browser.min.js"></script>
 <script type="module">
 const { Document, Packer, Paragraph, TextRun, ExternalHyperlink, Table, TableRow, TableCell, HeadingLevel, BorderStyle, ShadingType, WidthType } = docx;
 
@@ -285,6 +290,36 @@ ${toHtml(text)}
 </body>
 </html>`;
 
+const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-" });
+turndown.use(turndownPluginGfm.gfm);
+turndown.remove(["script", "style"]);
+// A markdown table row is a single line, so paragraphs and line breaks inside a cell become spaces
+turndown.addRule("tableCell", { filter: ["th", "td"], replacement: (content, node) => `${node.previousElementSibling ? "" : "|"} ${content.trim().replace(/\s*\n\s*/g, " ")} |` });
+const wrap = (el, tag) => {
+  const inner = document.createElement(tag);
+  inner.append(...el.childNodes);
+  el.append(inner);
+};
+
+// Google Docs wraps its clipboard HTML in a non-bold <b> with <br> spacers, sets bold and italic as inline styles, and puts sublists next to their item instead of inside it
+// TODO: lists pasted from desktop Word arrive as paragraphs styled with mso-list and stay numbered paragraphs; rebuild them into nested lists, until then drop the .docx instead
+function toMarkdown(html) {
+  const body = new DOMParser().parseFromString(html, "text/html").body;
+  for (const br of body.querySelectorAll("b[id^=docs-internal-guid] > br")) br.remove();
+  for (const b of body.querySelectorAll("b[id^=docs-internal-guid]")) b.replaceWith(...b.childNodes);
+  for (const span of body.querySelectorAll("span[style]")) {
+    if (span.style.fontWeight === "bold" || span.style.fontWeight >= 600) wrap(span, "strong");
+    if (span.style.fontStyle === "italic") wrap(span, "em");
+    if (span.style.textDecoration.includes("line-through")) wrap(span, "del");
+  }
+  for (const sublist of body.querySelectorAll(":is(ul, ol) > :is(ul, ol)")) sublist.previousElementSibling?.append(sublist);
+  // A paragraph inside a list item would make the markdown list loose, with blank lines between items
+  for (const p of body.querySelectorAll("li > p:only-of-type")) p.replaceWith(...p.childNodes);
+  // Markdown tables need a header row, which tables from Docs and Word rarely mark
+  for (const table of body.querySelectorAll("table")) if (!table.tHead && table.rows[0]) table.createTHead().append(table.rows[0]);
+  return turndown.turndown(body);
+}
+
 const base = () => name.value.trim().replace(/\.(docx|html)$/i, "") || "document";
 
 let timer;
@@ -306,19 +341,38 @@ function save(blob, filename) {
 function render() {
   preview.innerHTML = md.value.trim() ? toHtml(md.value) : "";
   $("count").textContent = `${md.value.length} characters`;
-  for (const b of document.querySelectorAll("button")) b.disabled = !md.value.trim();
+  for (const b of document.querySelectorAll(".buttons button")) b.disabled = !md.value.trim();
 }
 
 async function load(file) {
   if (!file) return;
-  if (!/\.(md|markdown|txt)$/i.test(file.name) && !file.type.startsWith("text/")) return flash("Please use a Markdown file (.md or .markdown)", true);
-  md.value = await file.text();
-  name.value = file.name.replace(/\.(md|markdown|txt)$/i, "");
+  try {
+    if (/\.docx$/i.test(file.name)) md.value = toMarkdown((await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() })).value);
+    else if (/\.html?$/i.test(file.name) || file.type === "text/html") md.value = toMarkdown(await file.text());
+    else if (/\.(md|markdown|txt)$/i.test(file.name) || file.type.startsWith("text/")) md.value = await file.text();
+    else return flash("Please use a Markdown (.md), Word (.docx) or HTML file", true);
+  } catch (e) {
+    console.error(e);
+    return flash(`Failed to read "${file.name}": ${e.message}`, true);
+  }
+  name.value = file.name.replace(/\.(md|markdown|txt|docx|html?)$/i, "");
   render();
 }
 
 md.addEventListener("input", render);
 $("file").addEventListener("change", (e) => load(e.target.files[0]));
+
+$("paste").addEventListener("click", async () => {
+  try {
+    const item = (await navigator.clipboard.read()).find((i) => i.types.includes("text/html"));
+    if (!item) return flash("Nothing formatted on the clipboard. Copy from Google Docs, Word or a web page first.", true);
+    md.value = toMarkdown(await (await item.getType("text/html")).text());
+    render();
+  } catch (e) {
+    console.error(e);
+    flash("Failed to read the clipboard. Allow clipboard access, or drop a .docx or .html file instead.", true);
+  }
+});
 
 // Dropping a file anywhere would otherwise make the browser navigate away from the page
 const isFile = (e) => e.dataTransfer.types.includes("Files");
