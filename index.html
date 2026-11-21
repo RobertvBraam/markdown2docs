@@ -301,10 +301,35 @@ const wrap = (el, tag) => {
   el.append(inner);
 };
 
+// Desktop Word sends list items as paragraphs styled with an mso-list id and level, with the bullet or number typed out in front
+function rebuildWordLists(body) {
+  let stack = [], listId;
+  for (const p of body.querySelectorAll("p[style*=mso-list]")) {
+    const [, id, level] = p.getAttribute("style").match(/mso-list:\s*(l\d+) level(\d+)/) ?? [];
+    if (!id) continue;
+    if (id !== listId || p.previousElementSibling !== stack[0]) stack = [];
+    listId = id;
+    const marker = p.querySelector("[style*='mso-list:Ignore']");
+    const label = marker?.textContent.trim() ?? "";
+    marker?.remove();
+    stack.length = Math.min(stack.length, level);
+    if (stack.length < level) {
+      const list = document.createElement(/^(\d+[.)]?|[a-z]+[.)])$/i.test(label) ? "ol" : "ul");
+      if (list.tagName === "OL") list.start = parseInt(label) || 1;
+      stack.length ? stack.at(-1).lastElementChild.append(list) : p.before(list);
+      stack.push(list);
+    }
+    const li = document.createElement("li");
+    li.append(...p.childNodes);
+    stack.at(-1).append(li);
+    p.remove();
+  }
+}
+
 // Google Docs wraps its clipboard HTML in a non-bold <b> with <br> spacers, sets bold and italic as inline styles, and puts sublists next to their item instead of inside it
-// TODO: lists pasted from desktop Word arrive as paragraphs styled with mso-list and stay numbered paragraphs; rebuild them into nested lists, until then drop the .docx instead
 function toMarkdown(html) {
   const body = new DOMParser().parseFromString(html, "text/html").body;
+  rebuildWordLists(body);
   for (const br of body.querySelectorAll("b[id^=docs-internal-guid] > br")) br.remove();
   for (const b of body.querySelectorAll("b[id^=docs-internal-guid]")) b.replaceWith(...b.childNodes);
   for (const span of body.querySelectorAll("span[style]")) {
