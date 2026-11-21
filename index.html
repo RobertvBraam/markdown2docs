@@ -317,27 +317,31 @@ const wrap = (el, tag) => {
   el.append(inner);
 };
 
-// Desktop Word sends list items as paragraphs styled with an mso-list id and level, with the bullet or number typed out in front
+// Desktop Word sends list items as paragraphs styled with an mso-list id and level, with the bullet or number typed out in front.
+// The level nests across lists, so a bullet list at level 2 belongs under the numbered item before it, as Word shows it.
 function rebuildWordLists(body) {
-  let stack = [], listId;
+  let stack = [];
   for (const p of body.querySelectorAll("p[style*=mso-list]")) {
-    const [, id, level] = p.getAttribute("style").match(/mso-list:\s*(l\d+) level(\d+)/) ?? [];
+    const [, id, depth] = p.getAttribute("style").match(/mso-list:\s*(l\d+) level(\d+)/) ?? [];
     if (!id) continue;
-    if (id !== listId || p.previousElementSibling !== stack[0]) stack = [];
-    listId = id;
+    const level = +depth;
+    if (p.previousElementSibling !== stack[0]?.list) stack = [];
+    while (stack.at(-1)?.level > level) stack.pop();
     const marker = p.querySelector("[style*='mso-list:Ignore']");
     const label = marker?.textContent.trim() ?? "";
     marker?.remove();
-    stack.length = Math.min(stack.length, level);
-    if (stack.length < level) {
+    const top = stack.at(-1);
+    if (top?.level !== level || top.id !== id) {
       const list = document.createElement(/^(\d+[.)]?|[a-z]+[.)])$/i.test(label) ? "ol" : "ul");
       if (list.tagName === "OL") list.start = parseInt(label) || 1;
-      stack.length ? stack.at(-1).lastElementChild.append(list) : p.before(list);
-      stack.push(list);
+      if (top?.level === level) top.list.after(list), stack.pop();
+      else if (top) top.list.lastElementChild.append(list);
+      else p.before(list);
+      stack.push({ list, id, level });
     }
     const li = document.createElement("li");
     li.append(...p.childNodes);
-    stack.at(-1).append(li);
+    stack.at(-1).list.append(li);
     p.remove();
   }
 }
