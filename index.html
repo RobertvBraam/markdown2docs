@@ -462,6 +462,12 @@ function toMarkdown(html) {
   for (const p of body.querySelectorAll("li > p:only-of-type")) p.replaceWith(...p.childNodes);
   // Markdown tables need a header row, which tables from Docs and Word rarely mark
   for (const table of body.querySelectorAll("table")) if (!table.tHead && table.rows[0]) table.createTHead().append(table.rows[0]);
+  // Word Online puts every item in a list of its own, so lists that simply continue each other become one again
+  for (const list of body.querySelectorAll("ul + ul, ol + ol")) {
+    const previous = list.previousElementSibling;
+    if (list.previousSibling.nodeType === Node.TEXT_NODE && list.previousSibling.textContent.trim()) continue;
+    if (list.tagName === "UL" || list.start === previous.start + previous.children.length) previous.append(...list.children), list.remove();
+  }
   splitAtNumberJumps(body);
   return turndown.turndown(body);
 }
