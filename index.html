@@ -311,6 +311,12 @@ turndown.use(turndownPluginGfm.gfm);
 turndown.remove(["script", "style"]);
 // A markdown table row is a single line, so paragraphs and line breaks inside a cell become spaces
 turndown.addRule("tableCell", { filter: ["th", "td"], replacement: (content, node) => `${node.previousElementSibling ? "" : "|"} ${content.trim().replace(/\s*\n\s*/g, " ")} |` });
+// Markdown reads two numbered lists in a row as one, so a list that directly follows another switches to the ")" delimiter, which starts a new list
+const listItem = turndown.rules.array.find((rule) => rule.filter === "li");
+turndown.addRule("followingListItem", {
+  filter: (node) => node.nodeName === "LI" && node.parentNode.nodeName === "OL" && node.parentNode.previousElementSibling?.nodeName === "OL",
+  replacement: (content, node, options) => listItem.replacement(content, node, options).replace(/^(\d+)\./, "$1)"),
+});
 const wrap = (el, tag) => {
   const inner = document.createElement(tag);
   inner.append(...el.childNodes);
@@ -347,22 +353,97 @@ function rebuildWordLists(body) {
 }
 
 const firstText = (element) => element.type === "text" ? element : element.children?.reduce((found, child) => found ?? firstText(child), null);
+const xmlChild = (element, name) => [...(element?.children ?? [])].find((child) => child.tagName === name);
+const xmlVal = (element) => element?.getAttribute("w:val") ?? undefined;
 
-// mammoth starts every numbered list at 1, so each numbered paragraph carries Word's running count into the HTML as a hidden prefix that becomes its list's start
-// TODO: a list that Word restarts at 1 (a startOverride on its w:num) keeps counting here, since mammoth reads neither the override nor the numId; reading numbering.xml would fix it
-async function docxToHtml(file) {
+// A .docx is a zip, and the browser can inflate its entries itself, so reading a few XML parts needs no library
+async function unzipText(buffer, names) {
+  const view = new DataView(buffer), files = {};
+  let end = buffer.byteLength - 22;
+  while (view.getUint32(end, true) !== 0x06054b50) end--;
+  for (let i = 0, entry = view.getUint32(end + 16, true); i < view.getUint16(end + 10, true); i++) {
+    const nameLength = view.getUint16(entry + 28, true), local = view.getUint32(entry + 42, true);
+    const name = new TextDecoder().decode(new Uint8Array(buffer, entry + 46, nameLength));
+    if (names.includes(name)) {
+      const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+      const data = new Blob([new Uint8Array(buffer, start, view.getUint32(entry + 20, true))]).stream();
+      files[name] = await new Response(view.getUint16(entry + 10, true) ? data.pipeThrough(new DecompressionStream("deflate-raw")) : data).text();
+    }
+    entry += 46 + nameLength + view.getUint16(entry + 30, true) + view.getUint16(entry + 32, true);
+  }
+  return files;
+}
+
+// Word counts numbered paragraphs per list definition and level, and a w:num with a startOverride restarts its level the first time it is used.
+// Paragraphs are picked the way mammoth picks them, so the numbers line up with mammoth's list items.
+async function wordNumbers(buffer) {
+  const parts = ["word/document.xml", "word/numbering.xml", "word/styles.xml"];
+  const files = await unzipText(buffer, parts);
+  if (!files["word/numbering.xml"]) return [];
+  const [body, numbering, styles] = parts.map((name) => new DOMParser().parseFromString(files[name] ?? "<x/>", "application/xml"));
+  const nums = {}, abstracts = {}, levelsByStyle = {}, styleNums = {};
+  for (const num of numbering.getElementsByTagName("w:num")) {
+    const overrides = {};
+    for (const override of num.getElementsByTagName("w:lvlOverride")) overrides[override.getAttribute("w:ilvl")] = xmlVal(xmlChild(override, "w:startOverride"));
+    nums[num.getAttribute("w:numId")] = { abstract: xmlVal(xmlChild(num, "w:abstractNumId")), overrides };
+  }
+  for (const abstract of numbering.getElementsByTagName("w:abstractNum")) {
+    const id = abstract.getAttribute("w:abstractNumId"), starts = {};
+    for (const lvl of abstract.getElementsByTagName("w:lvl")) {
+      const ilvl = lvl.getAttribute("w:ilvl") ?? "0", pStyle = xmlVal(xmlChild(lvl, "w:pStyle"));
+      starts[ilvl] = +(xmlVal(xmlChild(lvl, "w:start")) ?? 0);
+      if (pStyle) levelsByStyle[pStyle] = { abstract: id, ilvl };
+    }
+    abstracts[id] = { starts, link: xmlVal(xmlChild(abstract, "w:numStyleLink")) };
+  }
+  for (const style of styles.getElementsByTagName("w:style")) styleNums[style.getAttribute("w:styleId")] = xmlVal(xmlChild(xmlChild(xmlChild(style, "w:pPr"), "w:numPr"), "w:numId"));
+  const resolve = (numId, ilvl) => {
+    let abstract = nums[numId]?.abstract;
+    if (abstracts[abstract]?.link) abstract = nums[styleNums[abstracts[abstract].link]]?.abstract;
+    return abstracts[abstract]?.starts[ilvl] === undefined ? null : { abstract, ilvl, numId };
+  };
+  for (const choice of [...body.getElementsByTagName("mc:Choice")]) choice.remove();
+  const counters = {}, used = new Set(), numbers = [];
+  for (const p of body.getElementsByTagName("w:p")) {
+    const pPr = xmlChild(p, "w:pPr"), numPr = xmlChild(pPr, "w:numPr");
+    if (xmlChild(xmlChild(pPr, "w:rPr"), "w:del")) continue;
+    const ilvl = xmlVal(xmlChild(numPr, "w:ilvl")), numId = xmlVal(xmlChild(numPr, "w:numId"));
+    const level = ilvl !== undefined && numId !== undefined ? resolve(numId, ilvl) : levelsByStyle[xmlVal(xmlChild(pPr, "w:pStyle"))] ?? (numId === undefined ? null : resolve(numId, "0"));
+    if (!level) continue;
+    const counter = (counters[level.abstract] ??= []), key = `${level.numId}:${level.ilvl}`;
+    const restart = nums[level.numId]?.overrides[level.ilvl];
+    if (restart !== undefined && !used.has(key)) counter[level.ilvl] = restart - 1;
+    used.add(key);
+    counter[level.ilvl] = (counter[level.ilvl] ?? abstracts[level.abstract].starts[level.ilvl] - 1) + 1;
+    counter.length = +level.ilvl + 1;
+    numbers.push(counter[level.ilvl]);
+  }
+  return numbers;
+}
+
+// TODO: when the numbered paragraphs picked from document.xml do not line up with mammoth's (numbered paragraphs in text boxes or deleted table rows), this per-level count is used instead and lists Word restarts keep counting; picking paragraphs exactly like mammoth's reader would fix it
+function countPerLevel(levels) {
   const counts = new Map();
-  const transformDocument = mammoth.transforms.paragraph((paragraph) => {
-    const level = paragraph.numbering;
-    if (!level) return paragraph;
+  return levels.map((level) => {
     for (const other of counts.keys()) if (+other.level > +level.level) counts.delete(other);
     counts.set(level, (counts.get(level) ?? 0) + 1);
-    const text = firstText(paragraph);
-    if (level.isOrdered && text) text.value = `⁣${counts.get(level)}⁣${text.value}`;
+    return counts.get(level);
+  });
+}
+
+// mammoth starts every numbered list at 1, so each numbered paragraph carries its index into the HTML as a hidden prefix, which becomes the list item's value
+async function docxToHtml(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const numbers = await wordNumbers(arrayBuffer), levels = [];
+  const transformDocument = mammoth.transforms.paragraph((paragraph) => {
+    const text = paragraph.numbering?.isOrdered && firstText(paragraph);
+    if (text) text.value = `\u2063${levels.length}\u2063${text.value}`;
+    if (paragraph.numbering) levels.push(paragraph.numbering);
     return paragraph;
   });
-  const { value } = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() }, { transformDocument });
-  return value.replace(/<ol>(<li>(?:<[^>]+>)*)⁣(\d+)⁣/g, '<ol start="$2">$1').replace(/⁣\d+⁣/g, "");
+  const { value } = await mammoth.convertToHtml({ arrayBuffer }, { transformDocument });
+  const counts = numbers.length === levels.length ? numbers : countPerLevel(levels);
+  return value.replace(/<li>((?:<[^>]+>)*)\u2063(\d+)\u2063/g, (_, tags, i) => `<li value="${counts[i]}">${tags}`).replace(/\u2063\d+\u2063/g, "");
 }
 
 // Google Docs wraps its clipboard HTML in a non-bold <b> with <br> spacers, sets bold and italic as inline styles, and puts sublists next to their item instead of inside it
@@ -381,7 +462,27 @@ function toMarkdown(html) {
   for (const p of body.querySelectorAll("li > p:only-of-type")) p.replaceWith(...p.childNodes);
   // Markdown tables need a header row, which tables from Docs and Word rarely mark
   for (const table of body.querySelectorAll("table")) if (!table.tHead && table.rows[0]) table.createTHead().append(table.rows[0]);
+  splitAtNumberJumps(body);
   return turndown.turndown(body);
+}
+
+// A list item's value can restart or skip the numbering, which markdown can only show by starting a new list at that item
+function splitAtNumberJumps(body) {
+  for (const list of body.querySelectorAll("ol")) {
+    let current = list, next = list.start;
+    for (const li of [...list.children]) {
+      if (li.hasAttribute("value") && li.value !== next) {
+        if (li !== current.firstElementChild) {
+          const rest = document.createElement("ol");
+          current.after(rest);
+          current = rest;
+        }
+        current.start = li.value;
+      }
+      if (current !== list) current.append(li);
+      next = (li.hasAttribute("value") ? li.value : next) + 1;
+    }
+  }
 }
 
 const base = () => name.value.trim().replace(/\.(docx|html|md)$/i, "") || "document";
