@@ -186,14 +186,14 @@ Thanks all, see you Monday!
         <div class="name"><input id="name" value="document" placeholder="Enter file name"><span data-direction="to-docs">.docx</span><span data-direction="to-md" hidden>.md</span></div>
       </div>
       <div class="buttons" data-direction="to-md" hidden>
-        <button id="md-download"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download .md</button>
-        <button id="md-copy"><svg viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8"/></svg>Copy markdown</button>
+        <button id="md-docs"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download .md</button>
+        <button id="copy-docs"><svg viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8"/></svg>Copy markdown</button>
       </div>
       <div class="buttons" data-direction="to-docs">
-        <button id="docx"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download .docx</button>
-        <button id="html"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download .html</button>
-        <button id="pdf"><svg viewBox="0 0 24 24"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>Save as .pdf</button>
-        <button id="copy"><svg viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8"/></svg>Copy for Docs/Gmail</button>
+        <button id="docx-md"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download .docx</button>
+        <button id="html-md"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download .html</button>
+        <button id="pdf-md"><svg viewBox="0 0 24 24"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>Save as .pdf</button>
+        <button id="copy-md"><svg viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10 9H8M16 13H8M16 17H8"/></svg>Copy for Docs/Gmail</button>
       </div>
     </div>
   </section>
@@ -562,9 +562,9 @@ preview.addEventListener("input", () => {
   updateControls();
 });
 
-$("md-download").addEventListener("click", () => save(new Blob([md.value], { type: "text/markdown;charset=utf-8" }), `${base()}.md`));
+$("md-docs").addEventListener("click", () => save(new Blob([md.value], { type: "text/markdown;charset=utf-8" }), `${base()}.md`));
 
-$("md-copy").addEventListener("click", async () => {
+$("copy-docs").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(md.value);
     flash("Copied the markdown.");
@@ -583,7 +583,7 @@ document.addEventListener("drop", (e) => {
   if (isFile(e)) e.preventDefault(), load(e.dataTransfer.files[0]);
 });
 
-$("docx").addEventListener("click", async () => {
+$("docx-md").addEventListener("click", async () => {
   try {
     save(await Packer.toBlob(toDocx(md.value)), `${base()}.docx`);
   } catch (e) {
@@ -592,10 +592,10 @@ $("docx").addEventListener("click", async () => {
   }
 });
 
-$("html").addEventListener("click", () => save(new Blob([htmlDoc(md.value, base())], { type: "text/html;charset=utf-8" }), `${base()}.html`));
+$("html-md").addEventListener("click", () => save(new Blob([htmlDoc(md.value, base())], { type: "text/html;charset=utf-8" }), `${base()}.html`));
 
 // The print dialog's "Save as PDF" names the file after the iframe's <title>
-$("pdf").addEventListener("click", () => {
+$("pdf-md").addEventListener("click", () => {
   const frame = Object.assign(document.createElement("iframe"), { srcdoc: htmlDoc(md.value, base()) });
   frame.style.cssText = "position: fixed; width: 0; height: 0; border: 0";
   frame.onload = () => {
@@ -605,7 +605,7 @@ $("pdf").addEventListener("click", () => {
   document.body.append(frame);
 });
 
-$("copy").addEventListener("click", async () => {
+$("copy-md").addEventListener("click", async () => {
   try {
     await navigator.clipboard.write([new ClipboardItem({
       "text/html": new Blob([htmlDoc(md.value)], { type: "text/html" }),
